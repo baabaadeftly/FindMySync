@@ -76,7 +76,7 @@ struct ExtrasView: View {
 					title: "Generate Home Assistant config",
 					value: $generate_config,
 					subtitle:
-						"Create config for FindMy devices on known_devices.yaml file",
+						"Show entity IDs created in Home Assistant",
 					onChange: {
 						generate_config.toggle()
 						UserDefaults.standard.set(

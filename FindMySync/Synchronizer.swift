@@ -373,6 +373,7 @@ class Synchronizer {
                         print(identifier, beacon)
                         updateEntity(
                             id: identifier,
+                            name: beacon.name,
                             latitude: beacon.latitude,
                             longitude:
                                 beacon.longitude,
@@ -382,15 +383,7 @@ class Synchronizer {
                         )
 
                         if generate_config {
-                            haConfig += """
-                                findmy_\(identifier.replacingOccurrences(of: "-", with: "")):
-                                  name: "\(beacon.name)"
-                                  mac: FINDMY_\(identifier)
-                                  icon:
-                                  picture:
-                                  track: true
-
-                                """
+                            haConfig += "device_tracker.findmy_\(identifier.replacingOccurrences(of: "-", with: ""))  # \(beacon.name)\n"
                         }
 
                         log(
@@ -510,6 +503,7 @@ class Synchronizer {
 
                                         updateEntity(
                                             id: id,
+                                            name: name,
                                             latitude: latitude,
                                             longitude:
                                                 longitude,
@@ -519,15 +513,7 @@ class Synchronizer {
                                         )
 
                                         if generate_config {
-                                            haConfig += """
-                                                findmy_\(id.replacingOccurrences(of: "-", with: "")):
-                                                  name: "\(name)"
-                                                  mac: FINDMY_\(id)
-                                                  icon:
-                                                  picture:
-                                                  track: true
-
-                                                """
+                                            haConfig += "device_tracker.findmy_\(id.replacingOccurrences(of: "-", with: ""))  # \(name)\n"
                                         }
                                     } else {
                                         log(
@@ -655,6 +641,7 @@ class Synchronizer {
 
                                         updateEntity(
                                             id: id,
+                                            name: name,
                                             latitude: latitude,
                                             longitude:
                                                 longitude,
@@ -665,15 +652,7 @@ class Synchronizer {
                                         )
 
                                         if generate_config {
-                                            haConfig += """
-                                                findmy_\(id.replacingOccurrences(of: "-", with: "")):
-                                                  name: "\(name)"
-                                                  mac: FINDMY_\(id)
-                                                  icon:
-                                                  picture:
-                                                  track: true
-
-                                                """
+                                            haConfig += "device_tracker.findmy_\(id.replacingOccurrences(of: "-", with: ""))  # \(name)\n"
                                         }
                                     } else {
                                         log(
@@ -721,37 +700,48 @@ class Synchronizer {
     }
 
     func updateEntity(
-        id: String, latitude: NSNumber, longitude: NSNumber, accuracy: NSNumber,
+        id: String, name: String, latitude: NSNumber, longitude: NSNumber, accuracy: NSNumber,
         battery: NSNumber, address: String
     ) {
-        let url: String = UserDefaults.standard.string(forKey: "endpoint_url")!
+        let baseUrl: String = UserDefaults.standard.string(forKey: "endpoint_url")!
         let auth: String = UserDefaults.standard.string(forKey: "endpoint_auth")!
+
+        let sanitizedId = id.replacingOccurrences(of: "-", with: "")
+        let entityId = "findmy_\(sanitizedId)"
+        let urlString = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            + "/api/states/device_tracker.\(entityId)"
 
         let sessionConfig = URLSessionConfiguration.default
         let session = URLSession(
             configuration: sessionConfig, delegate: nil, delegateQueue: nil)
-        guard let URL = URL(string: url) else { return }
+        guard let URL = URL(string: urlString) else { return }
         var request = URLRequest(url: URL)
         request.httpMethod = "POST"
 
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         request.addValue(auth, forHTTPHeaderField: "Authorization")
 
-        var bodyObject: [String: Any] = [
-            "dev_id": "findmy_" + id.replacingOccurrences(of: "-", with: ""),
-            "gps": [
-                latitude.floatValue,
-                longitude.floatValue,
-            ],
-            "gps_accuracy": accuracy.floatValue,
-            "host_name": address,
+        var attributes: [String: Any] = [
+            "source_type": "gps",
+            "latitude": latitude.doubleValue,
+            "longitude": longitude.doubleValue,
+            "gps_accuracy": accuracy.doubleValue,
+            "friendly_name": name.isEmpty ? entityId : name,
         ]
 
-        if battery.floatValue > 0 {
-            bodyObject["battery"] =
-                (battery.floatValue > 0)
-                ? (battery.floatValue * 100) : battery.floatValue
+        if !address.isEmpty {
+            attributes["address"] = address
         }
+
+        if battery.floatValue > 0 {
+            attributes["battery_level"] = battery.floatValue * 100
+        }
+
+        let bodyObject: [String: Any] = [
+            "state": "not_home",
+            "attributes": attributes,
+        ]
+
         request.httpBody = try! JSONSerialization.data(
             withJSONObject: bodyObject, options: [])
 
@@ -762,7 +752,6 @@ class Synchronizer {
                 if error == nil {
                     let statusCode = (response as! HTTPURLResponse).statusCode
                     self.log("[" + id + "] Data sent: HTTP \(statusCode)")
-                    //                debugPrint(String(data: data!, encoding: .utf8))
                 } else {
                     self.log(
                         "[" + id
