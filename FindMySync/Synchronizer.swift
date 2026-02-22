@@ -708,8 +708,13 @@ class Synchronizer {
 
         let sanitizedId = id.replacingOccurrences(of: "-", with: "")
         let entityId = "findmy_\(sanitizedId)"
-        let urlString = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            + "/api/states/device_tracker.\(entityId)"
+
+        // Normalize: strip any legacy /api/... suffix so both old and new stored URLs work
+        var effectiveBaseUrl = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if let apiRange = effectiveBaseUrl.range(of: "/api/") {
+            effectiveBaseUrl = String(effectiveBaseUrl[..<apiRange.lowerBound])
+        }
+        let urlString = effectiveBaseUrl + "/api/states/device_tracker.\(entityId)"
 
         let sessionConfig = URLSessionConfiguration.default
         let session = URLSession(
