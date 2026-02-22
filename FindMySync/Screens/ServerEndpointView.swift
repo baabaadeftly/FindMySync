@@ -18,7 +18,7 @@ struct ServerEndpointView: View {
 				TextFieldView(
 					title: "URL",
 					value: $url,
-					subtitle: "Where data will be sent",
+					subtitle: "Home Assistant base URL (e.g. http://homeassistant.local:8123)",
 					onChange: {
 						UserDefaults.standard.set(
 							url, forKey: "endpoint_url")
