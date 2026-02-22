@@ -22,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 				"sources_items":
 					true,
 				"endpoint_url":
-					"http://homeassistant.local:8123",
+					"http://homeassistant.local:8123/api/services/device_tracker/see",
 				"endpoint_auth":
 					"Bearer <INSERT TOKEN HERE>",
                 "extra_interval":
