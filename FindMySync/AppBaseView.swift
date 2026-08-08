@@ -59,7 +59,7 @@ struct AppBaseView: View {
 					destination: ServerEndpointView(), tag: Screen.endpoint,
 					selection: $selection
 				) {
-					BackportLabel("Endpoint", systemImage: "globe")
+					BackportLabel("Broker", systemImage: "network")
 				}
 
 				NavigationLink(

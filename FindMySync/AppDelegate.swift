@@ -21,10 +21,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 					true,
 				"sources_items":
 					true,
-				"endpoint_url":
-					"http://homeassistant.local:8123",
-				"endpoint_auth":
-					"Bearer <INSERT TOKEN HERE>",
+				"mqtt_host":
+					"",
+				"mqtt_port":
+					"1883",
+				"mqtt_username":
+					"",
+				"mqtt_password":
+					"",
+				"mqtt_discovery_prefix":
+					"homeassistant",
+				"mqtt_topic_prefix":
+					"findmysync",
+				"mqtt_availability":
+					false,
                 "extra_interval":
                     "5",
 				"extra_beacon_key":

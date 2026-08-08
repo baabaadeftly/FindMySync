@@ -61,6 +61,19 @@ Please contribute using [GitHub Flow](https://guides.github.com/introduction/flo
 
 ## **Changelog**
 
+- **Fork: MQTT transport**
+  - Publishes to Home Assistant over MQTT discovery instead of the `device_tracker.see`
+    action, which is deprecated and removed in Home Assistant Core 2027.5.
+  - Two retained topics per device: a discovery config under `homeassistant/device_tracker/`
+    and a `json_attributes` topic carrying latitude, longitude, gps_accuracy and battery.
+  - No `state_topic` is published, so Home Assistant resolves zones from the coordinates
+    itself — `home` / `not_home` / zone name, as `device_tracker.see` used to.
+  - Retained topics mean the last known position survives a Home Assistant restart.
+  - Entity IDs are unchanged: `device_tracker.findmy_<identifier>`.
+  - The Endpoint pane is now Broker: host, port, credentials, discovery and topic
+    prefixes, and an optional availability (LWT) topic.
+  - `known_devices.yaml` is no longer generated or needed.
+
 - **v1.2 / 20240318-2212**
   - Add Sonoma 14.4 support (Thanks to [@YeapGuy](https://github.com/YeapGuy) and [@airy10](https://github.com/airy10))
 

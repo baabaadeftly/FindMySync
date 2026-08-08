@@ -53,6 +53,11 @@ class Synchronizer {
 
         log(dateFormatter.string(from: date) + "\n")
 
+        MQTTPublisher.shared.log = { message in
+            DispatchQueue.main.async { self.log(message) }
+        }
+        MQTTPublisher.shared.begin()
+
         let hide_findmy_app: Bool = UserDefaults.standard.bool(
             forKey: "extra_hide_findmy_app")
         let generate_config: Bool = UserDefaults.standard.bool(
@@ -383,7 +388,7 @@ class Synchronizer {
                         )
 
                         if generate_config {
-                            haConfig += "device_tracker.findmy_\(identifier.replacingOccurrences(of: "-", with: ""))  # \(beacon.name)\n"
+                            haConfig += "device_tracker.\(MQTTPublisher.entityId(for: identifier))  # \(beacon.name)\n"
                         }
 
                         log(
@@ -513,7 +518,7 @@ class Synchronizer {
                                         )
 
                                         if generate_config {
-                                            haConfig += "device_tracker.findmy_\(id.replacingOccurrences(of: "-", with: ""))  # \(name)\n"
+                                            haConfig += "device_tracker.\(MQTTPublisher.entityId(for: id))  # \(name)\n"
                                         }
                                     } else {
                                         log(
@@ -652,7 +657,7 @@ class Synchronizer {
                                         )
 
                                         if generate_config {
-                                            haConfig += "device_tracker.findmy_\(id.replacingOccurrences(of: "-", with: ""))  # \(name)\n"
+                                            haConfig += "device_tracker.\(MQTTPublisher.entityId(for: id))  # \(name)\n"
                                         }
                                     } else {
                                         log(
@@ -703,68 +708,14 @@ class Synchronizer {
         id: String, name: String, latitude: NSNumber, longitude: NSNumber, accuracy: NSNumber,
         battery: NSNumber, address: String
     ) {
-        let baseUrl: String = UserDefaults.standard.string(forKey: "endpoint_url")!
-        let auth: String = UserDefaults.standard.string(forKey: "endpoint_auth")!
-
-        let sanitizedId = id.replacingOccurrences(of: "-", with: "")
-        let entityId = "findmy_\(sanitizedId)"
-
-        // Normalize: strip any legacy /api/... suffix so both old and new stored URLs work
-        var effectiveBaseUrl = baseUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        if let apiRange = effectiveBaseUrl.range(of: "/api/") {
-            effectiveBaseUrl = String(effectiveBaseUrl[..<apiRange.lowerBound])
-        }
-        let urlString = effectiveBaseUrl + "/api/states/device_tracker.\(entityId)"
-
-        let sessionConfig = URLSessionConfiguration.default
-        let session = URLSession(
-            configuration: sessionConfig, delegate: nil, delegateQueue: nil)
-        guard let URL = URL(string: urlString) else { return }
-        var request = URLRequest(url: URL)
-        request.httpMethod = "POST"
-
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(auth, forHTTPHeaderField: "Authorization")
-
-        var attributes: [String: Any] = [
-            "source_type": "gps",
-            "latitude": latitude.doubleValue,
-            "longitude": longitude.doubleValue,
-            "gps_accuracy": accuracy.doubleValue,
-            "friendly_name": name.isEmpty ? entityId : name,
-        ]
-
-        if !address.isEmpty {
-            attributes["address"] = address
-        }
-
-        if battery.floatValue > 0 {
-            attributes["battery_level"] = battery.floatValue * 100
-        }
-
-        let bodyObject: [String: Any] = [
-            "state": "not_home",
-            "attributes": attributes,
-        ]
-
-        request.httpBody = try! JSONSerialization.data(
-            withJSONObject: bodyObject, options: [])
-
-        let task = session.dataTask(
-            with: request,
-            completionHandler: {
-                (data: Data?, response: URLResponse?, error: Error?) -> Void in
-                if error == nil {
-                    let statusCode = (response as! HTTPURLResponse).statusCode
-                    self.log("[" + id + "] Data sent: HTTP \(statusCode)")
-                } else {
-                    self.log(
-                        "[" + id
-                            + "] Data error: \(error!.localizedDescription)"
-                    )
-                }
-            })
-        task.resume()
-        session.finishTasksAndInvalidate()
+        MQTTPublisher.shared.publish(
+            identifier: id,
+            name: name,
+            latitude: latitude,
+            longitude: longitude,
+            accuracy: accuracy,
+            battery: battery,
+            address: address
+        )
     }
 }
