@@ -27,6 +27,6 @@ platform :mac do
       output_directory: "build"
     )
 
-    dmg(path: "build/FindMySync.app")
+    dmg(path: "build/FindMySync.app", size: 200)
   end
 end
