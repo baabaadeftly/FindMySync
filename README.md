@@ -26,16 +26,27 @@ is a fork rather than a rewrite.
 
 ## Requirements
 
-- macOS 10.15 (Catalina) or newer.
+- macOS 10.15 (Catalina) through 14.x (Sonoma). See the note below on Sequoia.
 - A Mac signed into iCloud with Find My enabled, left running. The cache the app reads is only
   written while Find My is refreshing.
 - Full Disk Access for the app, so it can read the Find My cache.
 - An MQTT broker Home Assistant is connected to. The Mosquitto add-on is the easy option.
 
-On macOS 14.4 and later, Apple encrypts the Find My store. The app reads the key from the
-keychain automatically where it can; if that fails, the Status pane prints the `security`
-command to retrieve it and you paste the value into Extras. Below 14.4 the cache is plain JSON
-and no key is needed.
+From macOS 14.4, Apple encrypts the Find My store. The app reads the key from the keychain
+automatically where it can; if that fails, the Status pane prints the `security` command to
+retrieve it and you paste the value into Extras. Below 14.4 the cache is plain JSON and no key
+is needed.
+
+### macOS 15 (Sequoia) and later
+
+This does not work on Sequoia or Tahoe. Apple changed the Find My store again and the cache
+reading inherited from upstream does not handle it — the same breakage the original app has.
+
+If you are on Sequoia or later, use [FindMySyncPlus](https://github.com/manonstreet/FindMySyncPlus)
+instead. It fixes the cache reading for current macOS and already has an MQTT transport with
+Home Assistant discovery, so it does everything this fork does and more. This fork exists for
+Macs that cannot run Sequoia — a 2014 Mac mini tops out at Monterey — where FindMySyncPlus is
+not an option.
 
 ## Setting it up
 
@@ -80,6 +91,32 @@ the Home Assistant documentation still lists, is ignored as of 2026.8 — a payl
 If you are coming from the original app, the order matters. Discovery arriving while the old
 entities still exist gets you `findmy_..._2` and loses the entity IDs.
 
+1. Quit the old app.
+2. Back up and delete `known_devices.yaml` from your Home Assistant config directory. It is not
+   used by this version.
+3. Restart Home Assistant and confirm the old `device_tracker.findmy_*` entities are gone.
+4. Install this app, enter the broker settings, and wait for the first sync.
+
+To roll back, reinstall the old build and restore `known_devices.yaml`. The MQTT entities remain
+until their retained discovery topics are cleared with an empty retained payload.
+
+## Building
+
+Pushes to `main` build a DMG through GitHub Actions and attach it to the `latest` prerelease.
+Locally:
+
+```bash
+bundle install
+bundle exec pod install
+bundle exec fastlane release
+```
+
+Builds are unsigned, so macOS will refuse the app on first launch — right-click → Open rather
+than double-clicking.
+
+## Known limitations
+
+- The broker password is stored in app preferences and shown in the c
 1. Quit the old app.
 2. Back up and delete `known_devices.yaml` from your Home Assistant config directory. It is not
    used by this version.
