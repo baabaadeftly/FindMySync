@@ -34,9 +34,13 @@ jobs:
           path: Pods
           key: ${{ runner.os }}-Pods-${{ hashFiles('./Podfile.lock') }}
 
-      - uses: maierj/fastlane-action@v3.0.0
-        with:
-          lane: 'release'
+      # Run fastlane directly rather than through maierj/fastlane-action, which
+      # is unmaintained. stdin is redirected from /dev/null as a second guard
+      # against tty-screen probing a non-terminal stdin.
+      - name: Build DMG
+        run: bundle exec fastlane release < /dev/null
+        env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -45,11 +49,9 @@ jobs:
           path: build/FindMySync.app.dmg
           if-no-files-found: warn
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
+          tag_name: latest
+          name: Development Build
           prerelease: true
-          title: "Development Build"
-          files: |
-            build/FindMySync.app.dmg
+          files: build/FindMySync.app.dmg

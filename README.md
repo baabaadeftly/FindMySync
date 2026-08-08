@@ -116,32 +116,6 @@ than double-clicking.
 
 ## Known limitations
 
-- The broker password is stored in app preferences and shown in the c
-1. Quit the old app.
-2. Back up and delete `known_devices.yaml` from your Home Assistant config directory. It is not
-   used by this version.
-3. Restart Home Assistant and confirm the old `device_tracker.findmy_*` entities are gone.
-4. Install this app, enter the broker settings, and wait for the first sync.
-
-To roll back, reinstall the old build and restore `known_devices.yaml`. The MQTT entities remain
-until their retained discovery topics are cleared with an empty retained payload.
-
-## Building
-
-Pushes to `main` build a DMG through GitHub Actions and attach it to the `latest` prerelease.
-Locally:
-
-```bash
-bundle install
-bundle exec pod install
-bundle exec fastlane release
-```
-
-Builds are unsigned, so macOS will refuse the app on first launch — right-click → Open rather
-than double-clicking.
-
-## Known limitations
-
 - The broker password is stored in app preferences and shown in the clear in the Broker pane.
 - No device registry entries are created, only entities. Trackers can be assigned to areas
   individually but not grouped as devices.
