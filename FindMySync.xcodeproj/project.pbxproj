@@ -22,6 +22,7 @@
 		5E024ACE2A30BCFE00A204D4 /* CheckboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E024ACD2A30BCFE00A204D4 /* CheckboxView.swift */; };
 		5E024AD02A30BD1700A204D4 /* TextFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E024ACF2A30BD1700A204D4 /* TextFieldView.swift */; };
 		5E711B8E2BA8575B001A8A04 /* Beacon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E711B8D2BA8575B001A8A04 /* Beacon.swift */; };
+		5EFA10022D0000010000FA02 /* MQTTPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFA10012D0000010000FA01 /* MQTTPublisher.swift */; };
 		5E9B19B02A30AEA000E47460 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9B19AF2A30AEA000E47460 /* AppDelegate.swift */; };
 		5E9B19B42A30AEA200E47460 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5E9B19B32A30AEA200E47460 /* Assets.xcassets */; };
 		5E9B19BA2A30AEA200E47460 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 5E9B19B82A30AEA200E47460 /* Main.storyboard */; };
@@ -45,6 +46,7 @@
 		5E024ACD2A30BCFE00A204D4 /* CheckboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckboxView.swift; sourceTree = "<group>"; };
 		5E024ACF2A30BD1700A204D4 /* TextFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFieldView.swift; sourceTree = "<group>"; };
 		5E711B8D2BA8575B001A8A04 /* Beacon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Beacon.swift; sourceTree = "<group>"; };
+		5EFA10012D0000010000FA01 /* MQTTPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MQTTPublisher.swift; sourceTree = "<group>"; };
 		5E9B19AC2A30AEA000E47460 /* FindMySync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FindMySync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E9B19AF2A30AEA000E47460 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5E9B19B32A30AEA200E47460 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				5E024ACA2A30BC8C00A204D4 /* AppBaseView.swift */,
 				5E024AB82A30B4BD00A204D4 /* Synchronizer.swift */,
 				5E711B8D2BA8575B001A8A04 /* Beacon.swift */,
+				5EFA10012D0000010000FA01 /* MQTTPublisher.swift */,
 				5E024AD22A30BD5100A204D4 /* Components */,
 				5E024ACC2A30BCDA00A204D4 /* Screens */,
 				5E024ABA2A30B4BD00A204D4 /* Extras.swift */,
@@ -274,6 +277,7 @@
 				5E024AC02A30B4BD00A204D4 /* HomeView.swift in Sources */,
 				5E9B19B02A30AEA000E47460 /* AppDelegate.swift in Sources */,
 				5E711B8E2BA8575B001A8A04 /* Beacon.swift in Sources */,
+				5EFA10022D0000010000FA02 /* MQTTPublisher.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

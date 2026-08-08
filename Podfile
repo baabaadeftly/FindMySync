@@ -17,4 +17,8 @@ target 'FindMySync' do
 
   pod 'AXSwift'
 
+  # MQTT transport to Home Assistant. Core subspec only — the WebSockets
+  # subspec drags in Starscream and is not needed for a plain broker.
+  pod 'CocoaMQTT/Core', '~> 2.2'
+
 end
