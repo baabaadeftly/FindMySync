@@ -691,14 +691,17 @@ class Synchronizer {
             }
         }
 
-        let interval: String = UserDefaults.standard.string(forKey: "extra_interval")!
-        log("Scheduling next update after " + interval + " minutes")
+        // Clamped read, so a stray value written by hand or over MQTT cannot
+        // schedule a zero-second timer. The previous force-unwrapped
+        // TimeInterval(interval)! also crashed on any non-numeric string.
+        let interval = MQTTPublisher.currentInterval()
+        log("Scheduling next update after \(interval) minutes")
 
         if let currentTimer = timer {
             currentTimer.invalidate()
         }
         self.timer = Timer.scheduledTimer(
-            withTimeInterval: TimeInterval(interval)! * 60, repeats: false
+            withTimeInterval: TimeInterval(interval) * 60, repeats: false
         ) { t in
             self.fetchData()
         }

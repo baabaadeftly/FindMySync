@@ -27,13 +27,18 @@ struct ExtrasView: View {
 				TextFieldView(
 					title: "Update interval",
 					value: $interval,
-					subtitle: "How many minutes each update",
+					subtitle:
+						"How many minutes between updates, 1–60. Also settable "
+						+ "from Home Assistant as number.findmy_update_interval.",
 					onChange: {
-						var newInterval = Int(interval)
-						if newInterval == nil {
-							newInterval = Int(1)
-						}
-						interval = newInterval!.description
+						// Same clamp the MQTT command path applies. The old
+						// nil-only guard let "0" through, which scheduled a
+						// zero-second timer and span the sync loop.
+						let requested = Int(interval) ?? MQTTPublisher.currentInterval()
+						let clamped = min(
+							max(requested, MQTTPublisher.minIntervalMinutes),
+							MQTTPublisher.maxIntervalMinutes)
+						interval = clamped.description
 						UserDefaults.standard.set(
 							interval, forKey: "extra_interval")
 
@@ -100,6 +105,12 @@ struct ExtrasView: View {
 				}
 			}
 			.padding()
+			.onAppear {
+				// Home Assistant can change the interval behind this pane's
+				// back, so re-read on every appearance rather than trusting
+				// the value captured at init.
+				interval = String(MQTTPublisher.currentInterval())
+			}
 		}
 
 	}

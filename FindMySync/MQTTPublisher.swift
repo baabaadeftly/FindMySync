@@ -22,6 +22,21 @@
 //  Home Assistant the moment it reconnects — the state survives a restart,
 //  which template device trackers do not.
 //
+//  Two control entities are also published, grouped under a single
+//  "FindMySync" device in the Home Assistant device registry:
+//
+//    <discovery_prefix>/number/findmysync_update_interval/config
+//    <discovery_prefix>/button/findmysync_sync_now/config
+//
+//  and the app subscribes to their command topics:
+//
+//    <topic_prefix>/interval/set     minutes, 1–60
+//    <topic_prefix>/sync/set         any payload triggers a sync pass
+//
+//  The interval command writes the `extra_interval` default — the same one
+//  the Extras pane writes — and reschedules the sync timer, so the poll rate
+//  becomes controllable from Home Assistant and from automations.
+//
 
 import CocoaMQTT
 import Foundation
@@ -33,13 +48,22 @@ final class MQTTPublisher {
     /// Assigned by Synchronizer so broker activity appears in the Status pane.
     var log: (_ message: String) -> Void = { debugPrint($0) }
 
+    /// Bounds for the sync interval, in minutes. Mirrored in the `number`
+    /// discovery payload so Home Assistant clamps before we have to.
+    static let minIntervalMinutes = 1
+    static let maxIntervalMinutes = 60
+
     private let queue = DispatchQueue(label: "com.findmysync.mqtt")
     private var client: CocoaMQTT?
     private var connectionSignature = ""
+    private var delegateShim: DelegateShim?
 
     /// entity ID -> the name last announced for it. Discovery is republished
     /// only when a device is new or has been renamed in Find My.
     private var announced = [String: String]()
+
+    /// Control discovery is published once per connection, not per sync pass.
+    private var controlsAnnounced = false
 
     private init() {}
 
@@ -50,6 +74,14 @@ final class MQTTPublisher {
     /// device_tracker.see produced from known_devices.yaml.
     static func entityId(for identifier: String) -> String {
         "findmy_" + identifier.replacingOccurrences(of: "-", with: "")
+    }
+
+    // MARK: - Interval
+
+    /// Reads `extra_interval`, clamped. The Extras pane writes the same key.
+    static func currentInterval() -> Int {
+        let raw = Int(UserDefaults.standard.string(forKey: "extra_interval") ?? "5") ?? 5
+        return min(max(raw, minIntervalMinutes), maxIntervalMinutes)
     }
 
     // MARK: - Settings
@@ -73,12 +105,28 @@ final class MQTTPublisher {
             "\(topicPrefix)/status"
         }
 
+        var intervalCommandTopic: String {
+            "\(topicPrefix)/interval/set"
+        }
+
+        var intervalStateTopic: String {
+            "\(topicPrefix)/interval/state"
+        }
+
+        var syncCommandTopic: String {
+            "\(topicPrefix)/sync/set"
+        }
+
         func attributesTopic(_ entityId: String) -> String {
             "\(topicPrefix)/\(entityId)/attributes"
         }
 
         func discoveryTopic(_ entityId: String) -> String {
             "\(discoveryPrefix)/device_tracker/\(entityId)/config"
+        }
+
+        func controlDiscoveryTopic(component: String, objectId: String) -> String {
+            "\(discoveryPrefix)/\(component)/\(objectId)/config"
         }
     }
 
@@ -126,6 +174,7 @@ final class MQTTPublisher {
                 if settings.publishAvailability {
                     self.send(topic: settings.statusTopic, payload: "online")
                 }
+                self.announceControlsIfNeeded(settings)
             } else {
                 self.log(
                     "MQTT: \(settings.host):\(settings.port) not reachable yet — "
@@ -152,15 +201,16 @@ final class MQTTPublisher {
                 self.announced[entityId] = displayName
             }
 
+            // `address` is deliberately not published. Apple's reverse geocoding
+            // flips between neighbouring street numbers on a stationary device,
+            // which forced a recorder write on every poll. The attributes topic
+            // is retained and replaced whole, so dropping the key here removes
+            // it from the entity on the next publish — no cleanup needed.
             var attributes: [String: Any] = [
                 "latitude": latitude.doubleValue,
                 "longitude": longitude.doubleValue,
                 "gps_accuracy": accuracy.doubleValue,
             ]
-
-            if !address.isEmpty {
-                attributes["address"] = address
-            }
 
             // Find My reports battery as a 0–1 fraction, and -1 when unknown.
             if battery.doubleValue > 0 {
@@ -208,6 +258,160 @@ final class MQTTPublisher {
         log("[\(entityId)] MQTT: discovery published")
     }
 
+    // MARK: - Control entities
+
+    /// The trackers stay entity-only — they were migrated from known_devices.yaml
+    /// and attaching them to a device now would risk their entity IDs. The two
+    /// controls are new, so they get a device block and group together in the
+    /// registry as "FindMySync".
+    private func deviceBlock() -> [String: Any] {
+        let version =
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "unknown"
+        return [
+            "identifiers": ["findmysync"],
+            "name": "FindMySync",
+            "manufacturer": "FindMySync",
+            "model": "Find My bridge (MQTT)",
+            "sw_version": version,
+        ]
+    }
+
+    private func announceControlsIfNeeded(_ settings: Settings) {
+        guard !controlsAnnounced else { return }
+
+        let device = deviceBlock()
+
+        var number: [String: Any] = [
+            "name": "Update interval",
+            "unique_id": "findmysync_update_interval",
+            "default_entity_id": "number.findmy_update_interval",
+            "command_topic": settings.intervalCommandTopic,
+            "state_topic": settings.intervalStateTopic,
+            "min": MQTTPublisher.minIntervalMinutes,
+            "max": MQTTPublisher.maxIntervalMinutes,
+            "step": 1,
+            "mode": "slider",
+            "unit_of_measurement": "min",
+            "icon": "mdi:timer-sync-outline",
+            "entity_category": "config",
+            // Retained commands mean the app picks the last value back up on
+            // restart even if it was offline when Home Assistant sent it.
+            "retain": true,
+            "device": device,
+        ]
+
+        var button: [String: Any] = [
+            "name": "Sync now",
+            "unique_id": "findmysync_sync_now",
+            "default_entity_id": "button.findmy_sync_now",
+            "command_topic": settings.syncCommandTopic,
+            "payload_press": "PRESS",
+            "icon": "mdi:refresh",
+            "device": device,
+        ]
+
+        if settings.publishAvailability {
+            number["availability_topic"] = settings.statusTopic
+            number["payload_available"] = "online"
+            number["payload_not_available"] = "offline"
+            button["availability_topic"] = settings.statusTopic
+            button["payload_available"] = "online"
+            button["payload_not_available"] = "offline"
+        }
+
+        if let payload = MQTTPublisher.json(number) {
+            send(
+                topic: settings.controlDiscoveryTopic(
+                    component: "number", objectId: "findmysync_update_interval"),
+                payload: payload)
+        }
+
+        if let payload = MQTTPublisher.json(button) {
+            send(
+                topic: settings.controlDiscoveryTopic(
+                    component: "button", objectId: "findmysync_sync_now"),
+                payload: payload)
+        }
+
+        send(
+            topic: settings.intervalStateTopic,
+            payload: String(MQTTPublisher.currentInterval()))
+
+        controlsAnnounced = true
+        log("MQTT: control entities published (update interval, sync now)")
+    }
+
+    private func subscribeToCommands(_ settings: Settings) {
+        guard let client = client else { return }
+        // cleanSession is true, so subscriptions do not survive a reconnect.
+        // This is called from didConnectAck on every connection, not just the first.
+        client.subscribe([
+            (settings.intervalCommandTopic, CocoaMQTTQoS.qos1),
+            (settings.syncCommandTopic, CocoaMQTTQoS.qos1),
+        ])
+    }
+
+    // MARK: - Command handling
+
+    fileprivate func handleIncoming(topic: String, payload: String) {
+        queue.async {
+            let settings = self.loadSettings()
+
+            if topic == settings.intervalCommandTopic {
+                let trimmed = payload.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let asDouble = Double(trimmed) else {
+                    self.log("MQTT: ignoring unparseable interval '\(trimmed)'")
+                    return
+                }
+
+                let requested = Int(asDouble.rounded())
+                let clamped = min(
+                    max(requested, MQTTPublisher.minIntervalMinutes),
+                    MQTTPublisher.maxIntervalMinutes)
+
+                if clamped != requested {
+                    self.log(
+                        "MQTT: interval \(requested) out of range, clamped to \(clamped) minutes")
+                }
+
+                let previous = MQTTPublisher.currentInterval()
+                UserDefaults.standard.set(String(clamped), forKey: "extra_interval")
+                self.send(topic: settings.intervalStateTopic, payload: String(clamped))
+
+                guard clamped != previous else {
+                    // A retained command replayed on reconnect, or a no-op set.
+                    // Echoing state is enough; re-running the sync pass is not.
+                    return
+                }
+
+                self.log("MQTT: update interval set to \(clamped) minutes")
+                // fetchData reschedules the timer at the end of the pass, and
+                // Timer.scheduledTimer needs the main run loop.
+                DispatchQueue.main.async { Synchronizer.shared.fetchData() }
+
+            } else if topic == settings.syncCommandTopic {
+                self.log("MQTT: sync requested from Home Assistant")
+                DispatchQueue.main.async { Synchronizer.shared.fetchData() }
+            }
+        }
+    }
+
+    fileprivate func handleConnected() {
+        queue.async {
+            let settings = self.loadSettings()
+            guard !settings.host.isEmpty else { return }
+
+            self.subscribeToCommands(settings)
+
+            if settings.publishAvailability {
+                self.send(topic: settings.statusTopic, payload: "online")
+            }
+
+            self.announceControlsIfNeeded(settings)
+        }
+    }
+
     private func send(topic: String, payload: String) {
         guard let client = client else { return }
         _ = client.publish(topic, withString: payload, qos: .qos1, retained: true)
@@ -234,7 +438,9 @@ final class MQTTPublisher {
         if connectionSignature != settings.signature, let existing = client {
             existing.disconnect()
             client = nil
+            delegateShim = nil
             announced.removeAll()
+            controlsAnnounced = false
         }
 
         if client == nil {
@@ -259,6 +465,10 @@ final class MQTTPublisher {
                 mqtt.willMessage = will
             }
 
+            let shim = DelegateShim(owner: self)
+            delegateShim = shim
+            mqtt.delegate = shim
+
             client = mqtt
             connectionSignature = settings.signature
             _ = mqtt.connect()
@@ -279,4 +489,51 @@ final class MQTTPublisher {
 
         return client?.connState == .connected
     }
+}
+
+// MARK: - Delegate
+
+/// CocoaMQTTDelegate is an @objc protocol, so the conformer has to be an
+/// NSObject. Keeping it in a shim rather than on MQTTPublisher itself avoids
+/// exposing nine delegate methods on the publisher's own surface.
+private final class DelegateShim: NSObject, CocoaMQTTDelegate {
+
+    private unowned let owner: MQTTPublisher
+
+    init(owner: MQTTPublisher) {
+        self.owner = owner
+        super.init()
+    }
+
+    func mqtt(_ mqtt: CocoaMQTT, didConnectAck ack: CocoaMQTTConnAck) {
+        guard ack == .accept else {
+            owner.log("MQTT: broker refused the connection (\(ack))")
+            return
+        }
+        owner.handleConnected()
+    }
+
+    func mqtt(_ mqtt: CocoaMQTT, didReceiveMessage message: CocoaMQTTMessage, id: UInt16) {
+        guard let payload = message.string else { return }
+        owner.handleIncoming(topic: message.topic, payload: payload)
+    }
+
+    func mqtt(_ mqtt: CocoaMQTT, didSubscribeTopics success: NSDictionary, failed: [String]) {
+        if !failed.isEmpty {
+            owner.log("MQTT: failed to subscribe to \(failed.joined(separator: ", "))")
+        }
+    }
+
+    func mqttDidDisconnect(_ mqtt: CocoaMQTT, withError err: Error?) {
+        if let err = err {
+            owner.log("MQTT: disconnected — \(err.localizedDescription)")
+        }
+    }
+
+    // Not used, but required by the protocol.
+    func mqtt(_ mqtt: CocoaMQTT, didPublishMessage message: CocoaMQTTMessage, id: UInt16) {}
+    func mqtt(_ mqtt: CocoaMQTT, didPublishAck id: UInt16) {}
+    func mqtt(_ mqtt: CocoaMQTT, didUnsubscribeTopics topics: [String]) {}
+    func mqttDidPing(_ mqtt: CocoaMQTT) {}
+    func mqttDidReceivePong(_ mqtt: CocoaMQTT) {}
 }
